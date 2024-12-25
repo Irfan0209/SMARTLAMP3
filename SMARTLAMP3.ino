@@ -1,3 +1,13 @@
+/*
+ * 0     state connect
+ * 1     auto
+ * 2     led1
+ * 3     led2
+ * 4     led3
+ * 5     alarmOn
+ * 13    alarmoff
+ */
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
@@ -27,6 +37,8 @@ bool  stateLed1;
 bool  stateLed2;
 bool  stateLed3;
 bool stateConnect;
+String alarmON;
+String alarmOFF;
 
 char ssidSTA[]     = "KELUARGA02";
 char passwordSTA[] = "mawarmerah";
@@ -86,28 +98,58 @@ void handleSetTime(){
   if (server.hasArg("WIFI")) {
     stateConnect =  server.arg("WIFI").toInt(); 
     wifiConnect();
+    EEPROM.put(0,stateConnect);
     server.send(200, "text/plain", (stateConnect)?"CONNECTED":"DISCONNECT");
   }
   if (server.hasArg("led1")) {
     stateLed1 = server.arg("led1").toInt(); 
     showLedClip(1);
+     EEPROM.put(2,led1);
     server.send(200, "text/plain", (stateLed1==1)?"led 1 ON" : "led 1 OFF");
   }
   if (server.hasArg("led2")) {
     stateLed2 = server.arg("led2").toInt(); 
     showLedClip(1);
+     EEPROM.put(3,led2);
     server.send(200, "text/plain", (stateLed2==1)?"led 2 ON" : "led 2 OFF");
   }
   if (server.hasArg("led3")) {
     stateLed3 = server.arg("led3").toInt(); 
     showLedClip(1);
+     EEPROM.put(4,led3);
     server.send(200, "text/plain", (stateLed3==1)?"led 3 ON" : "led 3 OFF");
   }
   if (server.hasArg("auto")) {
     stateAuto = server.arg("auto").toInt(); 
     showLedClip(1);
+     EEPROM.put(1,stateAuto);
     server.send(200, "text/plain", (stateAuto==1)?"stateAuto ON" : "stateAuto OFF");
   }
+  if (server.hasArg("setJam")) {
+    String Jam = server.arg("setJam"); 
+    int jam   = Jam.substring(0, 2).toInt();
+    int menit = Jam.substring(3, 5).toInt();
+    int detik = Jam.substring(6, 8).toInt();
+    setTime(jam,menit,detik,25,12,24);
+    server.send(200, "text/plain", "jam diupdate");
+   }
+   if (server.hasArg("alarmon")) {
+    alarmON = server.arg("alarmon"); 
+    int jam   = alarmON.substring(0, 2).toInt();
+    int menit = alarmON.substring(3, 5).toInt();
+    int detik = alarmON.substring(6, 8).toInt();
+    
+    server.send(200, "text/plain", "alarm ON");
+   }
+
+   if (server.hasArg("alarmoff")) {
+    alarmOFF = server.arg("jamOFF"); 
+    int jam   = alarmOFF.substring(0, 2).toInt();
+    int menit = alarmOFF.substring(3, 5).toInt();
+    int detik = alarmOFF.substring(6, 8).toInt();
+    
+    server.send(200, "text/plain", "alarm OFF");
+   }
 //  if (server.hasArg("newPassword")) {
 //    String newPassword = server.arg("newPassword");
 //    showLedClip(1);
@@ -118,6 +160,9 @@ void handleSetTime(){
 //      server.send(200, "text/plain", "Password WiFi diupdate");
 //    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
 //  } 
+  // write the data to EEPROM
+  boolean ok1 = EEPROM.commit();
+  Serial.println((ok1) ? "First commit OK" : "Commit failed");
   delay(100);
   showLedClip(0);
 }
@@ -198,7 +243,7 @@ void setup() {
      ArduinoOTA.begin();
      server.on("/setLamp", handleSetTime);
   server.begin();
-  setTime(5,0,0,25,12,24);
+  
 }
 
 void loop() {
