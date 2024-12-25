@@ -4,8 +4,11 @@
  * 2     led1
  * 3     led2
  * 4     led3
- * 5     alarmOn
- * 13    alarmoff
+ * 5     jamOn
+ * 13    meniton
+ * 21    jamoff
+ * 29    menitoff
+ * 37
  */
 
 #include <ESP8266WiFi.h>
@@ -28,17 +31,18 @@ ESP8266WebServer server(80);
 #define led_yellow D7 //kuning
 #define led_green D0
 
-IPAddress local_IP(192, 168, 4, 1);      // IP Address untuk AP
-IPAddress gateway(192, 168, 4, 1);       // Gateway
+IPAddress local_IP(192,168,100,8);      // IP Address untuk AP
+IPAddress gateway(192,168,100,8);       // Gateway
 IPAddress subnet(255, 255, 255, 0);      // Subnet mask
 
 bool  stateAuto;
 bool  stateLed1;
 bool  stateLed2;
 bool  stateLed3;
-bool stateConnect;
-String alarmON;
-String alarmOFF;
+bool  stateConnect;
+
+int jamOn,menitOn;
+int jamOff,menitOff;
 
 char ssidSTA[]     = "KELUARGA02";
 char passwordSTA[] = "mawarmerah";
@@ -57,33 +61,33 @@ void wifiConnect() {
   WiFi.disconnect();
   delay(1000);
 
- if(stateConnect){
-  Serial.println("Wifi Sation Mode");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssidSTA, passwordSTA);
-  unsigned long startTime = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(50);
-    Serial.print(".");
-    beatLED();
-    if (millis() - startTime > 10000) break;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    stateConnect = 1;
-  } else {
+  if(stateConnect){
+    Serial.println("Wifi Sation Mode");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssidSTA, passwordSTA);
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(50);
+      Serial.print(".");
+      beatLED();
+      if (millis() - startTime > 10000) break;
+    }
+  
+    if (WiFi.status() == WL_CONNECTED) {
+      stateConnect = 1;
+    }else{
+      Serial.println("Wifi AP Mode");
+      WiFi.mode(WIFI_AP);
+      WiFi.softAPConfig(local_IP, gateway, subnet);
+      WiFi.softAP(ssidAP);
+      stateConnect = 0;
+     }
+  }else{
     Serial.println("Wifi AP Mode");
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ssidAP);
-    stateConnect = 0;
   }
- }else{
-    Serial.println("Wifi AP Mode");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(local_IP, gateway, subnet);
-    WiFi.softAP(ssidAP);
- }
   
   Serial.println("Server dimulai.");  
   Serial.print("IP Address: ");
@@ -93,8 +97,7 @@ void wifiConnect() {
 // Fungsi untuk mengatur jam, tanggal, running text, dan kecerahan
 void handleSetTime(){
   Serial.println("hansle run");
-  //static int flag = 0;
-  //Buzzer(1);
+  
   if (server.hasArg("WIFI")) {
     stateConnect =  server.arg("WIFI").toInt(); 
     wifiConnect();
@@ -104,25 +107,25 @@ void handleSetTime(){
   if (server.hasArg("led1")) {
     stateLed1 = server.arg("led1").toInt(); 
     showLedClip(1);
-     EEPROM.put(2,led1);
+    EEPROM.put(2,led1);
     server.send(200, "text/plain", (stateLed1==1)?"led 1 ON" : "led 1 OFF");
   }
   if (server.hasArg("led2")) {
     stateLed2 = server.arg("led2").toInt(); 
     showLedClip(1);
-     EEPROM.put(3,led2);
+    EEPROM.put(3,led2);
     server.send(200, "text/plain", (stateLed2==1)?"led 2 ON" : "led 2 OFF");
   }
   if (server.hasArg("led3")) {
     stateLed3 = server.arg("led3").toInt(); 
     showLedClip(1);
-     EEPROM.put(4,led3);
+    EEPROM.put(4,led3);
     server.send(200, "text/plain", (stateLed3==1)?"led 3 ON" : "led 3 OFF");
   }
   if (server.hasArg("auto")) {
     stateAuto = server.arg("auto").toInt(); 
     showLedClip(1);
-     EEPROM.put(1,stateAuto);
+    EEPROM.put(1,stateAuto);
     server.send(200, "text/plain", (stateAuto==1)?"stateAuto ON" : "stateAuto OFF");
   }
   if (server.hasArg("setJam")) {
@@ -134,20 +137,21 @@ void handleSetTime(){
     server.send(200, "text/plain", "jam diupdate");
    }
    if (server.hasArg("alarmon")) {
-    alarmON = server.arg("alarmon"); 
+    String alarmON = server.arg("alarmon"); 
     int jam   = alarmON.substring(0, 2).toInt();
     int menit = alarmON.substring(3, 5).toInt();
     int detik = alarmON.substring(6, 8).toInt();
-    
+    EEPROM.put(5,jam);
+    EEPROM.put(13,menit);
     server.send(200, "text/plain", "alarm ON");
    }
-
    if (server.hasArg("alarmoff")) {
-    alarmOFF = server.arg("jamOFF"); 
+    String alarmOFF = server.arg("jamOFF"); 
     int jam   = alarmOFF.substring(0, 2).toInt();
     int menit = alarmOFF.substring(3, 5).toInt();
     int detik = alarmOFF.substring(6, 8).toInt();
-    
+    EEPROM.put(21,jam);
+    EEPROM.put(29,menit);
     server.send(200, "text/plain", "alarm OFF");
    }
 //  if (server.hasArg("newPassword")) {
@@ -194,7 +198,8 @@ String readStringFromEEPROM(int startAddr) {
 void setup() {
   Serial.begin(115200);
   EEPROM.begin(EEPROM_SIZE); // Inisialisasi EEPROM dengan ukuran yang ditentukan
- 
+
+  loadEEPROM();
   pinMode(led_yellow, OUTPUT);
   pinMode(led_green, OUTPUT);
   pinMode(led1, OUTPUT);
@@ -239,51 +244,64 @@ void setup() {
       Serial.println("End Failed");
     }
   });
-      /* setup the OTA server */
-     ArduinoOTA.begin();
-     server.on("/setLamp", handleSetTime);
+  /* setup the OTA server */
+  ArduinoOTA.begin();
+  server.on("/setLamp", handleSetTime);
   server.begin();
   
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  ArduinoOTA.handle();
+ ArduinoOTA.handle();
  server.handleClient();
 
  if(stateAuto){
    int jam = hour();
    int menit=minute();
    int detik=second();
+
    Serial.print(jam);
    Serial.print(":");
    Serial.print(menit);
    Serial.print(":");
    Serial.print(detik);
    Serial.println();
-   if(jam == 5 && menit == 1 && detik == 0){
+
+   if(jam == jamOn && menit == menitOn && detik == 0){
      digitalWrite(led1, LOW);
      digitalWrite(led2, LOW);
      digitalWrite(led3, LOW);
    }
-   if(jam == 5 && menit == 2 && detik == 0){
+   if(jam == jamOff && menit == menitOff && detik == 0){
      digitalWrite(led1, HIGH);
      digitalWrite(led2, HIGH);
      digitalWrite(led3, HIGH);
    }
- }else{
- if(stateLed1){  digitalWrite(led1, LOW); }
- else         {  digitalWrite(led1, HIGH); }
-
- if(stateLed2){  digitalWrite(led2, LOW); }
- else         {  digitalWrite(led2, HIGH); }
-
- if(stateLed3){  digitalWrite(led3, LOW); }
- else         {  digitalWrite(led3, HIGH); }
- }
- showLedIndi(stateConnect);
+  }else{
+     if(stateLed1){  digitalWrite(led1, LOW); }
+     else         {  digitalWrite(led1, HIGH); }
+    
+     if(stateLed2){  digitalWrite(led2, LOW); }
+     else         {  digitalWrite(led2, HIGH); }
+    
+     if(stateLed3){  digitalWrite(led3, LOW); }
+     else         {  digitalWrite(led3, HIGH); }
+   }
+   showLedIndi(stateConnect);
 }
 
+void loadEEPROM(){
+  stateConnect = EEPROM.read(0);
+  stateAuto    = EEPROM.read(1);
+  stateLed1    = EEPROM.read(2);
+  stateLed2    = EEPROM.read(3);
+  stateLed3    = EEPROM.read(4);
+  jamOn        = EEPROM.read(5);
+  menitOn      = EEPROM.read(13);
+  jamOff       = EEPROM.read(21);
+  menitOff     = EEPROM.read(29);
+}
 void showLedClip(uint8_t state){
   switch(state){
     case 0 : 
