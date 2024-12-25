@@ -1,6 +1,8 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <WebOTA.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include "TimeLib.h"
 #include <ESP_EEPROM.h>
 
@@ -26,50 +28,55 @@ bool  stateLed2;
 bool  stateLed3;
 bool stateConnect;
 
-char ssid[]     = "KELUARGA02";
-char password[] = "bungasari";
+char ssidSTA[]     = "KELUARGA02";
+char passwordSTA[] = "mawarmerah";
+
+const char* host = "OTA-smartlamp";
+
+char ssidAP[]      = "SMARTLAMP";
 
 #define BOARD_LED_BRIGHTNESS 255  // Kecerahan maksimum 244 dari 255
 #define DIMM(x) ((uint32_t)(x) * (BOARD_LED_BRIGHTNESS) / 255)
 uint8_t m_Counter = 0;   // Penghitung 8-bit untuk efek breathe
 uint32_t beat[] = {100, 200};
 
-void AP_init(){
-  // Konfigurasi hotspot WiFi dari ESP8266
-  WiFi.softAP(ssid);
-  WiFi.softAPConfig(local_IP, gateway, subnet);
- 
-  IPAddress myIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(myIP);
+void wifiConnect() {
+  WiFi.softAPdisconnect(true);
+  WiFi.disconnect();
+  delay(1000);
 
-  // Atur server untuk menerima permintaan set waktu, tanggal, teks, dan kecerahan
-  server.on("/setLamp", handleSetTime);
-  server.begin();
-  Serial.println("Server dimulai.");  
-}
-
-// Fungsi untuk menghubungkan ke WiFi router
-void WiFiConnect() {
-  WiFi.mode(WIFI_STA); // Atur mode Station
-  WiFi.begin(ssid, password); // Hubungkan ke WiFi router
-  WiFi.softAPConfig(local_IP, gateway, subnet);
-
-  Serial.print("Menghubungkan ke WiFi");
+ if(stateConnect){
+  Serial.println("Wifi Sation Mode");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssidSTA, passwordSTA);
+  unsigned long startTime = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(50);
     Serial.print(".");
+    beatLED();
+    if (millis() - startTime > 10000) break;
   }
 
-  Serial.println("\nWiFi terhubung!");
-  Serial.print("Alamat IP: ");
-  Serial.println(WiFi.localIP()); // Tampilkan alamat IP yang diberikan router
-  // Atur server untuk menerima permintaan set waktu, tanggal, teks, dan kecerahan
-  server.on("/setLamp", handleSetTime);
-  server.begin();
+  if (WiFi.status() == WL_CONNECTED) {
+    stateConnect = 1;
+  } else {
+    Serial.println("Wifi AP Mode");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(local_IP, gateway, subnet);
+    WiFi.softAP(ssidAP);
+    stateConnect = 0;
+  }
+ }else{
+    Serial.println("Wifi AP Mode");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(local_IP, gateway, subnet);
+    WiFi.softAP(ssidAP);
+ }
+  
   Serial.println("Server dimulai.");  
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 }
-
 
 // Fungsi untuk mengatur jam, tanggal, running text, dan kecerahan
 void handleSetTime(){
@@ -78,6 +85,7 @@ void handleSetTime(){
   //Buzzer(1);
   if (server.hasArg("WIFI")) {
     stateConnect =  server.arg("WIFI").toInt(); 
+    wifiConnect();
     server.send(200, "text/plain", (stateConnect)?"CONNECTED":"DISCONNECT");
   }
   if (server.hasArg("led1")) {
@@ -100,16 +108,16 @@ void handleSetTime(){
     showLedClip(1);
     server.send(200, "text/plain", (stateAuto==1)?"stateAuto ON" : "stateAuto OFF");
   }
-  if (server.hasArg("newPassword")) {
-    String newPassword = server.arg("newPassword");
-    showLedClip(1);
-    if(newPassword.length()==8){
-      Serial.println(String()+"newPassword:"+newPassword);
-      newPassword.toCharArray(password, newPassword.length() + 1); // Set password baru
-      saveStringToEEPROM(56, password); // Simpan password AP
-      server.send(200, "text/plain", "Password WiFi diupdate");
-    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
-  } 
+//  if (server.hasArg("newPassword")) {
+//    String newPassword = server.arg("newPassword");
+//    showLedClip(1);
+//    if(newPassword.length()==8){
+//      Serial.println(String()+"newPassword:"+newPassword);
+//      newPassword.toCharArray(password, newPassword.length() + 1); // Set password baru
+//      saveStringToEEPROM(56, password); // Simpan password AP
+//      server.send(200, "text/plain", "Password WiFi diupdate");
+//    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
+//  } 
   delay(100);
   showLedClip(0);
 }
@@ -141,22 +149,84 @@ String readStringFromEEPROM(int startAddr) {
 void setup() {
   Serial.begin(115200);
   EEPROM.begin(EEPROM_SIZE); // Inisialisasi EEPROM dengan ukuran yang ditentukan
-  http://192.168.2.1:8080/webota
+ 
   pinMode(led_yellow, OUTPUT);
   pinMode(led_green, OUTPUT);
   pinMode(led1, OUTPUT);
   pinMode(led2, OUTPUT);
   pinMode(led3, OUTPUT);
   //digitalWrite(led_pin, LOW);
-  WiFiConnect();   //Inisialisasi Access Pointt
+  wifiConnect();   //Inisialisasi Access Pointt
+
+     ArduinoOTA.setHostname(host);
+
+     ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else {  // U_FS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    Serial.println("Start updating " + type);
+  });
   
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+  });
+      /* setup the OTA server */
+     ArduinoOTA.begin();
+     server.on("/setLamp", handleSetTime);
+  server.begin();
+  setTime(5,0,0,25,12,24);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  ArduinoOTA.handle();
  server.handleClient();
- webota.handle();
- 
+
+ if(stateAuto){
+   int jam = hour();
+   int menit=minute();
+   int detik=second();
+   Serial.print(jam);
+   Serial.print(":");
+   Serial.print(menit);
+   Serial.print(":");
+   Serial.print(detik);
+   Serial.println();
+   if(jam == 5 && menit == 1 && detik == 0){
+     digitalWrite(led1, LOW);
+     digitalWrite(led2, LOW);
+     digitalWrite(led3, LOW);
+   }
+   if(jam == 5 && menit == 2 && detik == 0){
+     digitalWrite(led1, HIGH);
+     digitalWrite(led2, HIGH);
+     digitalWrite(led3, HIGH);
+   }
+ }else{
  if(stateLed1){  digitalWrite(led1, LOW); }
  else         {  digitalWrite(led1, HIGH); }
 
@@ -165,10 +235,7 @@ void loop() {
 
  if(stateLed3){  digitalWrite(led3, LOW); }
  else         {  digitalWrite(led3, HIGH); }
-
-// if(stateLed1){  digitalWrite(led_pin, LOW); }
-// else         {  digitalWrite(led_pin, LOW); }
-
+ }
  showLedIndi(stateConnect);
 }
 
