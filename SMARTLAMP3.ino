@@ -97,36 +97,46 @@ void wifiConnect() {
 // Fungsi untuk mengatur jam, tanggal, running text, dan kecerahan
 void handleSetTime(){
   Serial.println("hansle run");
-  
+  showLedClip(1);
   if (server.hasArg("WIFI")) {
     stateConnect =  server.arg("WIFI").toInt(); 
     wifiConnect();
     EEPROM.put(0,stateConnect);
     server.send(200, "text/plain", (stateConnect)?"CONNECTED":"DISCONNECT");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
   }
   if (server.hasArg("led1")) {
     stateLed1 = server.arg("led1").toInt(); 
     showLedClip(1);
     EEPROM.put(2,led1);
     server.send(200, "text/plain", (stateLed1==1)?"led 1 ON" : "led 1 OFF");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
   }
   if (server.hasArg("led2")) {
     stateLed2 = server.arg("led2").toInt(); 
     showLedClip(1);
     EEPROM.put(3,led2);
     server.send(200, "text/plain", (stateLed2==1)?"led 2 ON" : "led 2 OFF");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
   }
   if (server.hasArg("led3")) {
     stateLed3 = server.arg("led3").toInt(); 
     showLedClip(1);
     EEPROM.put(4,led3);
     server.send(200, "text/plain", (stateLed3==1)?"led 3 ON" : "led 3 OFF");
+    boolean ok1 = EEPROM.commit();
+   Serial.println((ok1) ? "First commit OK" : "Commit failed");
   }
   if (server.hasArg("auto")) {
     stateAuto = server.arg("auto").toInt(); 
     showLedClip(1);
     EEPROM.put(1,stateAuto);
     server.send(200, "text/plain", (stateAuto==1)?"stateAuto ON" : "stateAuto OFF");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
   }
   if (server.hasArg("setJam")) {
     String Jam = server.arg("setJam"); 
@@ -134,25 +144,55 @@ void handleSetTime(){
     int menit = Jam.substring(3, 5).toInt();
     int detik = Jam.substring(6, 8).toInt();
     setTime(jam,menit,detik,25,12,24);
+    char data[10];
+    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    Serial.print("setJam:");
+    Serial.println(data);
     server.send(200, "text/plain", "jam diupdate");
    }
-   if (server.hasArg("alarmon")) {
-    String alarmON = server.arg("alarmon"); 
+   if (server.hasArg("alarmOn")) {
+    String alarmON = server.arg("alarmOn"); 
     int jam   = alarmON.substring(0, 2).toInt();
     int menit = alarmON.substring(3, 5).toInt();
     int detik = alarmON.substring(6, 8).toInt();
+    jamOn = jam;
+    menitOn = menit;
     EEPROM.put(5,jam);
     EEPROM.put(13,menit);
+    char data[10];
+    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    Serial.print("alarmOn:");
+    Serial.println(data);
     server.send(200, "text/plain", "alarm ON");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
    }
-   if (server.hasArg("alarmoff")) {
-    String alarmOFF = server.arg("jamOFF"); 
+   if (server.hasArg("alarmOff")) {
+    String alarmOFF = server.arg("alarmOff"); 
     int jam   = alarmOFF.substring(0, 2).toInt();
     int menit = alarmOFF.substring(3, 5).toInt();
     int detik = alarmOFF.substring(6, 8).toInt();
+    jamOff = jam;
+    menitOff = menit;
     EEPROM.put(21,jam);
     EEPROM.put(29,menit);
+    char data[10];
+    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    Serial.print("alarmOff:");
+    Serial.println(data);
     server.send(200, "text/plain", "alarm OFF");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+   }
+   if (server.hasArg("jam")) {
+    int jam = hour();
+    int menit = minute();
+    int detik = second();
+    char data[10];
+    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    server.send(200, "text/plain", data);
+    Serial.print("jam:");
+    Serial.println(data);
    }
 //  if (server.hasArg("newPassword")) {
 //    String newPassword = server.arg("newPassword");
@@ -165,8 +205,7 @@ void handleSetTime(){
 //    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
 //  } 
   // write the data to EEPROM
-  boolean ok1 = EEPROM.commit();
-  Serial.println((ok1) ? "First commit OK" : "Commit failed");
+  
   delay(100);
   showLedClip(0);
 }
@@ -301,6 +340,16 @@ void loadEEPROM(){
   menitOn      = EEPROM.read(13);
   jamOff       = EEPROM.read(21);
   menitOff     = EEPROM.read(29);
+
+  Serial.println("stateConnect:"+String(stateConnect));
+  Serial.println("stateAuto   :"+String(stateAuto));
+  Serial.println("stateLed1   :"+String(stateLed1));
+  Serial.println("stateLed2   :"+String(stateLed2));
+  Serial.println("stateLed3   :"+String(stateLed3));
+  Serial.println("jamOn       :"+String(jamOn));
+  Serial.println("menitOn     :"+String(menitOn));
+  Serial.println("jamOff      :"+String(jamOff));
+  Serial.println("menitOff    :"+String(menitOff));
 }
 void showLedClip(uint8_t state){
   switch(state){
