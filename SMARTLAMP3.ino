@@ -44,6 +44,10 @@ bool  stateConnect;
 int jamOn,menitOn;
 int jamOff,menitOff;
 
+bool pointLed1 = false;
+bool pointLed2 = false;
+bool pointLed3 = false;
+
 char ssidSTA[]     = "KELUARGA02";
 char passwordSTA[] = "mawarmerah";
 
@@ -194,6 +198,21 @@ void handleSetTime(){
     Serial.print("jam:");
     Serial.println(data);
    }
+   if (server.hasArg("setPoint")) {
+    String point = server.arg("setPoint"); 
+    pointLed1 = point.substring(0, 1).toInt();
+    pointLed2 = point.substring(1, 2).toInt();
+    pointLed3 = point.substring(2, 3).toInt();
+
+    EEPROM.put(37,pointLed1);
+    EEPROM.put(38,pointLed2);
+    EEPROM.put(39,pointLed3);
+
+    server.send(200, "text/plain", "point led has been set");
+    boolean ok1 = EEPROM.commit();
+    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+
+   }
 //  if (server.hasArg("newPassword")) {
 //    String newPassword = server.arg("newPassword");
 //    showLedClip(1);
@@ -308,13 +327,17 @@ void loop() {
    Serial.println();
 
    if(jam == jamOn && menit == menitOn && detik == 0){
-     digitalWrite(led1, LOW);
-     digitalWrite(led2, LOW);
-     digitalWrite(led3, LOW);
+     (pointLed1)?digitalWrite(led1, LOW):digitalWrite(led1, HIGH);
+     delay(50);
+     (pointLed2)?digitalWrite(led2, LOW):digitalWrite(led2, HIGH);
+     delay(50);
+     (pointLed3)?digitalWrite(led3, LOW):digitalWrite(led3, HIGH);
    }
    if(jam == jamOff && menit == menitOff && detik == 0){
      digitalWrite(led1, HIGH);
+     delay(100);
      digitalWrite(led2, HIGH);
+     delay(100);
      digitalWrite(led3, HIGH);
    }
   }else{
@@ -340,7 +363,10 @@ void loadEEPROM(){
   menitOn      = EEPROM.read(13);
   jamOff       = EEPROM.read(21);
   menitOff     = EEPROM.read(29);
-
+  pointLed1    = EEPROM.read(37);
+  pointLed2    = EEPROM.read(38);
+  pointLed3    = EEPROM.read(39);
+  
   Serial.println("stateConnect:"+String(stateConnect));
   Serial.println("stateAuto   :"+String(stateAuto));
   Serial.println("stateLed1   :"+String(stateLed1));
@@ -350,6 +376,9 @@ void loadEEPROM(){
   Serial.println("menitOn     :"+String(menitOn));
   Serial.println("jamOff      :"+String(jamOff));
   Serial.println("menitOff    :"+String(menitOff));
+  Serial.println("pointLed1   :"+String(pointLed1));
+  Serial.println("pointLed2   :"+String(pointLed2));
+  Serial.println("pointLed3   :"+String(pointLed3));
 }
 void showLedClip(uint8_t state){
   switch(state){
