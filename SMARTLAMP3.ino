@@ -129,21 +129,21 @@ void handleSetTime(){
   
   if (server.hasArg("led1")) {
     stateLed1 = server.arg("led1").toInt(); 
-    EEPROM.write(2,led1);
+    EEPROM.write(2,stateLed1);
     server.send(200, "text/plain", (stateLed1==1)?"led 1 ON" : "led 1 OFF");
     ok1 = true;
   }
   
   if (server.hasArg("led2")) {
     stateLed2 = server.arg("led2").toInt(); 
-    EEPROM.write(3,led2);
+    EEPROM.write(3,stateLed2);
     server.send(200, "text/plain", (stateLed2==1)?"led 2 ON" : "led 2 OFF");
     ok1 = true;
   }
   
   if (server.hasArg("led3")) {
     stateLed3 = server.arg("led3").toInt(); 
-    EEPROM.write(4,led3);
+    EEPROM.write(4,stateLed3);
     server.send(200, "text/plain", (stateLed3==1)?"led 3 ON" : "led 3 OFF");
     ok1 = true;
   }
@@ -180,7 +180,7 @@ void handleSetTime(){
     EEPROM.write(13,menit);
     
     char data[10];
-    sprintf(data,"%02d:%02d",jamOn,menitOn);
+    sprintf(data,"ON=%02d:%02d",jamOn,menitOn);
     Serial.print("alarmOn:");
     Serial.println(data);
     server.send(200, "text/plain", data);
@@ -199,7 +199,7 @@ void handleSetTime(){
     EEPROM.write(29,menit);
     
     char data[10];
-    sprintf(data,"%02d:%02d",jam,menit);
+    sprintf(data,"OFF=%02d:%02d",jam,menit);
     Serial.print("alarmOff:");
     Serial.println(data);
     server.send(200, "text/plain", data);
@@ -230,8 +230,10 @@ void handleSetTime(){
     EEPROM.put(37,pointLed1);
     EEPROM.put(38,pointLed2);
     EEPROM.put(39,pointLed3);
-    
-    server.send(200, "text/plain", "point led has been set");
+
+//    char data[5];
+//    sprintf(data,"%s:%s:%s",pointLed1,pointLed2,pointLed3);
+    server.send(200, "text/plain", "set point done");
     ok1 = true;
    }
    
@@ -292,7 +294,9 @@ void setup() {
   pinMode(led1, OUTPUT);
   pinMode(led2, OUTPUT);
   pinMode(led3, OUTPUT);
-  //digitalWrite(led_pin, LOW);
+  digitalWrite(led1, HIGH);
+  digitalWrite(led2, HIGH);
+  digitalWrite(led3, HIGH);
   wifiConnect();   //Inisialisasi Access Pointt
 
   ArduinoOTA.setHostname(host);
@@ -366,11 +370,11 @@ void loop() {
    }
    else if(jam == jamOff && menit == menitOff && detik == 00){
      Serial.println("jamOff active");
-     digitalWrite(led1, HIGH);
+     (pointLed1)?digitalWrite(led1, HIGH):digitalWrite(led1, LOW);
      delay(50);
-     digitalWrite(led2, HIGH);
+     (pointLed2)?digitalWrite(led2, HIGH):digitalWrite(led2, LOW);
      delay(50);
-     digitalWrite(led3, HIGH);
+     (pointLed3)?digitalWrite(led3, HIGH):digitalWrite(led3, LOW);
    }
   }else{
      if(stateLed1){  digitalWrite(led1, LOW); }
