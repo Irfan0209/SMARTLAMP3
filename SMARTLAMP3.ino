@@ -370,11 +370,11 @@ void loop() {
    }
    else if(jam == jamOff && menit == menitOff && detik == 00){
      Serial.println("jamOff active");
-     (pointLed1)?digitalWrite(led1, HIGH):digitalWrite(led1, LOW);
+     if(pointLed1){digitalWrite(led1, HIGH);}//digitalWrite(led1, LOW);
      delay(50);
-     (pointLed2)?digitalWrite(led2, HIGH):digitalWrite(led2, LOW);
+     if(pointLed2){digitalWrite(led2, HIGH);}//digitalWrite(led2, LOW);
      delay(50);
-     (pointLed3)?digitalWrite(led3, HIGH):digitalWrite(led3, LOW);
+     if(pointLed3){digitalWrite(led3, HIGH);}//digitalWrite(led3, LOW);
    }
   }else{
      if(stateLed1){  digitalWrite(led1, LOW); }
