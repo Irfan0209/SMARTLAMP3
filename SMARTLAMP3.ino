@@ -18,6 +18,7 @@
 #include <ArduinoOTA.h>
 #include "TimeLib.h"
 #include <ESP_EEPROM.h>
+#include <NTPClient.h>
 
 // Ukuran EEPROM (pastikan cukup untuk semua data)
 #define EEPROM_SIZE 200
@@ -35,18 +36,26 @@ IPAddress local_IP(192,168,100,8);      // IP Address untuk AP
 IPAddress gateway(192,168,100,8);       // Gateway
 IPAddress subnet(255, 255, 255, 0);      // Subnet mask
 
+const long utcOffsetInSeconds = 25200;
+WiFiUDP ntpUDP;
+NTPClient Clock(ntpUDP, "asia.pool.ntp.org", utcOffsetInSeconds);
+
 bool  stateAuto;
 bool  stateLed1;
 bool  stateLed2;
 bool  stateLed3;
 bool  stateConnect;
 
-int jamOn,menitOn;
-int jamOff,menitOff;
+uint8_t jamOn,menitOn;
+uint8_t jamOff,menitOff;
 
-bool pointLed1 = false;
-bool pointLed2 = false;
-bool pointLed3 = false;
+//uint8_t jam;
+//uint8_t menit;
+//uint8_t detik;
+
+bool pointLed1 = true;
+bool pointLed2 = true;
+bool pointLed3 = true;
 
 char ssidSTA[]     = "KELUARGA02";
 char passwordSTA[] = "mawarmerah";
@@ -79,6 +88,9 @@ void wifiConnect() {
   
     if (WiFi.status() == WL_CONNECTED) {
       stateConnect = 1;
+      Clock.begin();//NTP
+      Clock.update();
+      setTime(Clock.getHours(),Clock.getMinutes(),Clock.getSeconds(),12,02,2025);
     }else{
       Serial.println("Wifi AP Mode");
       WiFi.mode(WIFI_AP);
@@ -101,47 +113,48 @@ void wifiConnect() {
 // Fungsi untuk mengatur jam, tanggal, running text, dan kecerahan
 void handleSetTime(){
   Serial.println("hansle run");
-  showLedClip(1);
+  bool ok1 = false;
+  
+  if (server.hasArg("status")) { //auto,led1,led2,led3,wifi,
+    server.send(200, "text/plain", "CONNECTED");
+  }
+  
   if (server.hasArg("WIFI")) {
     stateConnect =  server.arg("WIFI").toInt(); 
     wifiConnect();
-    EEPROM.put(0,stateConnect);
+    EEPROM.write(0,stateConnect);
     server.send(200, "text/plain", (stateConnect)?"CONNECTED":"DISCONNECT");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    ok1 = true;
   }
+  
   if (server.hasArg("led1")) {
     stateLed1 = server.arg("led1").toInt(); 
-    showLedClip(1);
-    EEPROM.put(2,led1);
+    EEPROM.write(2,led1);
     server.send(200, "text/plain", (stateLed1==1)?"led 1 ON" : "led 1 OFF");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    ok1 = true;
   }
+  
   if (server.hasArg("led2")) {
     stateLed2 = server.arg("led2").toInt(); 
-    showLedClip(1);
-    EEPROM.put(3,led2);
+    EEPROM.write(3,led2);
     server.send(200, "text/plain", (stateLed2==1)?"led 2 ON" : "led 2 OFF");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    ok1 = true;
   }
+  
   if (server.hasArg("led3")) {
     stateLed3 = server.arg("led3").toInt(); 
-    showLedClip(1);
-    EEPROM.put(4,led3);
+    EEPROM.write(4,led3);
     server.send(200, "text/plain", (stateLed3==1)?"led 3 ON" : "led 3 OFF");
-    boolean ok1 = EEPROM.commit();
-   Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    ok1 = true;
   }
+  
   if (server.hasArg("auto")) {
     stateAuto = server.arg("auto").toInt(); 
-    showLedClip(1);
-    EEPROM.put(1,stateAuto);
+    EEPROM.write(1,stateAuto);
     server.send(200, "text/plain", (stateAuto==1)?"stateAuto ON" : "stateAuto OFF");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    ok1 = true;
   }
+  
   if (server.hasArg("setJam")) {
     String Jam = server.arg("setJam"); 
     int jam   = Jam.substring(0, 2).toInt();
@@ -153,80 +166,96 @@ void handleSetTime(){
     Serial.print("setJam:");
     Serial.println(data);
     server.send(200, "text/plain", "jam diupdate");
-   }
+  }
+  
    if (server.hasArg("alarmOn")) {
     String alarmON = server.arg("alarmOn"); 
     int jam   = alarmON.substring(0, 2).toInt();
     int menit = alarmON.substring(3, 5).toInt();
-    int detik = alarmON.substring(6, 8).toInt();
+    
     jamOn = jam;
     menitOn = menit;
-    EEPROM.put(5,jam);
-    EEPROM.put(13,menit);
+    
+    EEPROM.write(5,jam);
+    EEPROM.write(13,menit);
+    
     char data[10];
-    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    sprintf(data,"%02d:%02d",jamOn,menitOn);
     Serial.print("alarmOn:");
     Serial.println(data);
-    server.send(200, "text/plain", "alarm ON");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    server.send(200, "text/plain", data);
+    ok1 = true;
    }
+   
    if (server.hasArg("alarmOff")) {
     String alarmOFF = server.arg("alarmOff"); 
     int jam   = alarmOFF.substring(0, 2).toInt();
     int menit = alarmOFF.substring(3, 5).toInt();
-    int detik = alarmOFF.substring(6, 8).toInt();
+  
     jamOff = jam;
     menitOff = menit;
-    EEPROM.put(21,jam);
-    EEPROM.put(29,menit);
+    
+    EEPROM.write(21,jam);
+    EEPROM.write(29,menit);
+    
     char data[10];
-    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    sprintf(data,"%02d:%02d",jam,menit);
     Serial.print("alarmOff:");
     Serial.println(data);
-    server.send(200, "text/plain", "alarm OFF");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
+    server.send(200, "text/plain", data);
+    ok1 = true;
    }
+   
    if (server.hasArg("jam")) {
     int jam = hour();
     int menit = minute();
     int detik = second();
     char data[10];
-    sprintf(data,"%02d:%02d:%02d",jam,menit,detik);
+    sprintf(data,"jam:%02d:%02d",jam,menit);
     server.send(200, "text/plain", data);
     Serial.print("jam:");
     Serial.println(data);
    }
+   
    if (server.hasArg("setPoint")) {
     String point = server.arg("setPoint"); 
     pointLed1 = point.substring(0, 1).toInt();
     pointLed2 = point.substring(1, 2).toInt();
     pointLed3 = point.substring(2, 3).toInt();
 
+    Serial.println("pointLed1" + String(pointLed1));
+    Serial.println("pointLed2" + String(pointLed2));
+    Serial.println("pointLed3" + String(pointLed3));
+    
     EEPROM.put(37,pointLed1);
     EEPROM.put(38,pointLed2);
     EEPROM.put(39,pointLed3);
-
+    
     server.send(200, "text/plain", "point led has been set");
-    boolean ok1 = EEPROM.commit();
-    Serial.println((ok1) ? "First commit OK" : "Commit failed");
-
+    ok1 = true;
    }
-//  if (server.hasArg("newPassword")) {
-//    String newPassword = server.arg("newPassword");
-//    showLedClip(1);
-//    if(newPassword.length()==8){
-//      Serial.println(String()+"newPassword:"+newPassword);
-//      newPassword.toCharArray(password, newPassword.length() + 1); // Set password baru
-//      saveStringToEEPROM(56, password); // Simpan password AP
-//      server.send(200, "text/plain", "Password WiFi diupdate");
-//    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
-//  } 
+   
+  /* if (server.hasArg("getData")) {
+    char data[30];
+    sprintf(data,"%s-%s-%s-%s-%s-%s-%s-%02d:%02d-%02d:%02d",
+    stateAuto,stateLed1,stateLed2,stateLed3,pointLed1,pointLed2,pointLed3,jamOn,menitOn,jamOff,menitOff);
+    server.send(200, "text/plain", data);
+   }
+  if (server.hasArg("newPassword")) {
+    String newPassword = server.arg("newPassword");
+    showLedClip(1);
+    if(newPassword.length()==8){
+      Serial.println(String()+"newPassword:"+newPassword);
+      newPassword.toCharArray(password, newPassword.length() + 1); // Set password baru
+      saveStringToEEPROM(56, password); // Simpan password AP
+      server.send(200, "text/plain", "Password WiFi diupdate");
+    }else{Serial.println("panjang password melebihi 8 karakter"); server.send(200, "text/plain", "panjang password melebihi 8 karakter");}
+  } */
+
   // write the data to EEPROM
+  if(ok1) EEPROM.commit();
+  Serial.println((ok1) ? "First commit OK" : "Commit failed");
   
-  delay(100);
-  showLedClip(0);
 }
 
 // Fungsi untuk menyimpan string ke EEPROM
@@ -266,15 +295,15 @@ void setup() {
   //digitalWrite(led_pin, LOW);
   wifiConnect();   //Inisialisasi Access Pointt
 
-     ArduinoOTA.setHostname(host);
+  ArduinoOTA.setHostname(host);
 
-     ArduinoOTA.onStart([]() {
+  ArduinoOTA.onStart([]() {
     String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
+  if (ArduinoOTA.getCommand() == U_FLASH) {
       type = "sketch";
-    } else {  // U_FS
+  } else {  // U_FS
       type = "filesystem";
-    }
+  }
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
     Serial.println("Start updating " + type);
@@ -313,12 +342,13 @@ void loop() {
   // put your main code here, to run repeatedly:
  ArduinoOTA.handle();
  server.handleClient();
-
+ //Disconnect();
+ 
  if(stateAuto){
-   int jam = hour();
-   int menit=minute();
-   int detik=second();
-
+    uint8_t jam   = hour();
+    uint8_t menit = minute();
+    uint8_t detik = second();
+   showLedClip(1);
    Serial.print(jam);
    Serial.print(":");
    Serial.print(menit);
@@ -326,18 +356,20 @@ void loop() {
    Serial.print(detik);
    Serial.println();
 
-   if(jam == jamOn && menit == menitOn && detik == 0){
+   if(jam == jamOn && menit == menitOn && detik == 00){
+     Serial.println("jamOn active");
      (pointLed1)?digitalWrite(led1, LOW):digitalWrite(led1, HIGH);
      delay(50);
      (pointLed2)?digitalWrite(led2, LOW):digitalWrite(led2, HIGH);
      delay(50);
      (pointLed3)?digitalWrite(led3, LOW):digitalWrite(led3, HIGH);
    }
-   if(jam == jamOff && menit == menitOff && detik == 0){
+   else if(jam == jamOff && menit == menitOff && detik == 00){
+     Serial.println("jamOff active");
      digitalWrite(led1, HIGH);
-     delay(100);
+     delay(50);
      digitalWrite(led2, HIGH);
-     delay(100);
+     delay(50);
      digitalWrite(led3, HIGH);
    }
   }else{
@@ -349,9 +381,18 @@ void loop() {
     
      if(stateLed3){  digitalWrite(led3, LOW); }
      else         {  digitalWrite(led3, HIGH); }
+     showLedClip(0);
    }
    showLedIndi(stateConnect);
 }
+
+//void Disconnect(){
+//  if (WiFi.status() != WL_CONNECTED) {
+//    delay(100);
+//    stateConnect=0;
+//    ESP.restart();
+//  }
+//}
 
 void loadEEPROM(){
   stateConnect = EEPROM.read(0);
@@ -380,6 +421,7 @@ void loadEEPROM(){
   Serial.println("pointLed2   :"+String(pointLed2));
   Serial.println("pointLed3   :"+String(pointLed3));
 }
+
 void showLedClip(uint8_t state){
   switch(state){
     case 0 : 
