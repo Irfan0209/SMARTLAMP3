@@ -57,8 +57,8 @@ bool pointLed1 = true;
 bool pointLed2 = true;
 bool pointLed3 = true;
 
-char ssidSTA[]     = "KELUARGA02";
-char passwordSTA[] = "mawarmerah";
+char ssidSTA[]     = "WiFi Control";
+char passwordSTA[] = "irfan-02";
 
 const char* host = "OTA-smartlamp";
 
@@ -376,7 +376,9 @@ void loop() {
      delay(50);
      if(pointLed3){digitalWrite(led3, HIGH);}//digitalWrite(led3, LOW);
    }
-  }else{
+   return;
+  }
+  //if{
      if(stateLed1){  digitalWrite(led1, LOW); }
      else         {  digitalWrite(led1, HIGH); }
     
@@ -386,7 +388,7 @@ void loop() {
      if(stateLed3){  digitalWrite(led3, LOW); }
      else         {  digitalWrite(led3, HIGH); }
      showLedClip(0);
-   }
+  // }
    showLedIndi(stateConnect);
 }
 
